@@ -8,26 +8,34 @@ Este projeto foi criado exclusivamente para fins de estudo e aprendizado sobre p
 O objetivo deste repositório é explorar e demonstrar técnicas de programação em Lua aplicadas a jogos, incluindo:
 
 - **Aimbot**: Sistema de mira automática com controle de recoil e suavização.
-- **ESP (Extra Sensory Perception)**: Exibição de esqueletos dos jogadores na tela para facilitar a visualização.
+- **ESP (Extra Sensory Perception)**: Exibição de esqueletos dos jogadores na tela, barra de vida e texto de vida acima da cabeça dos oponentes.
+- **Menu interativo**: Ative/desative funções do script em tempo real usando atalhos no teclado.
 - **Configurações customizáveis**: Parâmetros ajustáveis para estudo e experimentação.
 
 > **Atenção:** Este projeto é apenas para fins educacionais. Não incentive o uso de scripts para obter vantagens injustas em jogos online.
 
 ## 🚀 Funcionalidades
 
-- Mira automática com controle de recoil
-- Desenho de círculo de FOV e esqueletos dos jogadores
+- Mira automática com compensação total de recoil (tiros sempre retos)
+- Desenho de círculo de FOV e esqueletos dos jogadores (ESP)
+- Barra de vida e texto de vida exibidos acima dos oponentes
 - Suporte a checagem de times e saúde dos jogadores
-- Configuração de teclas para ativação/desativação
+- Menu visual para ativar/desativar Aimbot, ESP, Team Check e Recoil Control (tecla padrão: RightShift)
+- Atalhos rápidos para alternar funções do menu (teclas 1-4)
+- Limpeza automática de desenhos ao resetar personagem ou sair do jogo
 
 ## 🔧 Configurações
 
-As configurações do Aimbot e ESP podem ser ajustadas no arquivo `config.lua`. As principais opções incluem:
+As configurações do Aimbot e ESP podem ser ajustadas diretamente no início do arquivo `script.lua`. As principais opções incluem:
 
-- `aimbot.enabled`: Ativa ou desativa o aimbot.
-- `aimbot.smoothness`: Controla a suavidade da mira automática.
-- `esp.enabled`: Ativa ou desativa o ESP.
-- `esp.teamCheck`: Verifica se os jogadores estão no mesmo time.
+- `espEnabled`: Ativa ou desativa o ESP.
+- `aimbotEnabled`: Ativa ou desativa o aimbot.
+- `teamCheck`: Verifica se os jogadores estão no mesmo time.
+- `fov`: Define o raio do círculo de FOV.
+- `smoothness`: Controla a suavidade da mira automática.
+- `recoilControl`: Ativa a compensação total do recoil.
+- `aimKey`: Tecla para ativar o aimbot (padrão: botão esquerdo do mouse).
+- `toggleMenuKey`: Tecla para abrir/fechar o menu (padrão: RightShift).
 
 ## 🤝 Contribuições
 
