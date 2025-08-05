@@ -1,10 +1,3 @@
---[[
-    Projeto de Estudo: Aimbot & ESP em Lua
-    Autor: Joao Francisco da Silva
-    Descrição: Script educacional para estudo de automação, desenho e manipulação de eventos em jogos Roblox.
-    Github: https://github.com/joaofsdev
-]]
-
 -- Serviços Roblox
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
