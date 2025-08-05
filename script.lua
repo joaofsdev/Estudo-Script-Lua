@@ -1,26 +1,35 @@
--- Serviços e variáveis
+--[[
+    Projeto de Estudo: Aimbot & ESP em Lua
+    Autor: Joao Francisco da Silva
+    Descrição: Script educacional para estudo de automação, desenho e manipulação de eventos em jogos Roblox.
+    Github: https://github.com/joaofsdev
+]]
+
+-- Serviços Roblox
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+-- Variáveis globais
 local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local aiming = false
 local showMenu = false
 local recoilOffset = Vector2.new(0, 0)
 
--- Configurações do Aimbot
+-- Configurações
 local config = {
     espEnabled = true,
     aimbotEnabled = true,
     teamCheck = true,
     fov = 100,
-    smoothness = 0.5, -- Aumentar para deixar o aimbot mais agressivo
+    smoothness = 0.5,
     recoilControl = true,
-    aimKey = Enum.UserInputType.MouseButton1, -- Alterar o botao de acao do aimbot
-    toggleMenuKey = Enum.KeyCode.RightShift -- Alterar a tecla para abrir/fechar o menu (Sem menu ainda, mas pode ser implementado futuramente)
+    aimKey = Enum.UserInputType.MouseButton1,
+    toggleMenuKey = Enum.KeyCode.RightShift
 }
 
+-- Drawing: FOV Circle
 local fovCircle = Drawing.new("Circle")
 fovCircle.Color = Color3.fromRGB(255, 255, 255)
 fovCircle.Thickness = 1
@@ -29,16 +38,10 @@ fovCircle.Filled = false
 fovCircle.Transparency = 0.4
 fovCircle.Visible = true
 
+-- Estruturas para ESP
 local skeletons = {}
-
-local function createLine()
-    local line = Drawing.new("Line")
-    line.Thickness = 1
-    line.Color = Color3.fromRGB(255, 0, 0)
-    line.Visible = false
-    return line
-end
-
+local healthBars = {}
+local healthTexts = {}
 local bodyParts = {
     {"Head", "UpperTorso"},
     {"UpperTorso", "LowerTorso"},
@@ -52,10 +55,51 @@ local bodyParts = {
     {"RightUpperLeg", "RightLowerLeg"},
 }
 
+local function createLine()
+    local line = Drawing.new("Line")
+    line.Thickness = 1
+    line.Color = Color3.fromRGB(255, 0, 0)
+    line.Visible = false
+    return line
+end
+
 local function createSkeleton(player)
     skeletons[player] = {}
-    for _, _ in pairs(bodyParts) do
+    for _ = 1, #bodyParts do
         table.insert(skeletons[player], createLine())
+    end
+    if not healthBars[player] then
+        local bar = Drawing.new("Line")
+        bar.Thickness = 4
+        bar.Color = Color3.fromRGB(0, 255, 0)
+        bar.Visible = false
+        healthBars[player] = bar
+    end
+    if not healthTexts[player] then
+        local txt = Drawing.new("Text")
+        txt.Size = 14
+        txt.Color = Color3.fromRGB(255,255,255)
+        txt.Outline = true
+        txt.Center = true
+        txt.Visible = false
+        healthTexts[player] = txt
+    end
+end
+
+local function removeSkeleton(player)
+    if skeletons[player] then
+        for _, line in ipairs(skeletons[player]) do
+            line:Remove()
+        end
+        skeletons[player] = nil
+    end
+    if healthBars[player] then
+        healthBars[player]:Remove()
+        healthBars[player] = nil
+    end
+    if healthTexts[player] then
+        healthTexts[player]:Remove()
+        healthTexts[player] = nil
     end
 end
 
@@ -68,7 +112,10 @@ local function updateSkeleton(player)
     end
 
     local lines = skeletons[player]
-    local visible = config.espEnabled and player.Team ~= localPlayer.Team and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0
+    local visible = config.espEnabled
+        and player.Team ~= localPlayer.Team
+        and char:FindFirstChild("Humanoid")
+        and char.Humanoid.Health > 0
 
     for i, pair in ipairs(bodyParts) do
         local p1 = char:FindFirstChild(pair[1])
@@ -76,7 +123,6 @@ local function updateSkeleton(player)
         if p1 and p2 then
             local pos1, vis1 = camera:WorldToViewportPoint(p1.Position)
             local pos2, vis2 = camera:WorldToViewportPoint(p2.Position)
-
             lines[i].From = Vector2.new(pos1.X, pos1.Y)
             lines[i].To = Vector2.new(pos2.X, pos2.Y)
             lines[i].Visible = visible and vis1 and vis2
@@ -84,17 +130,44 @@ local function updateSkeleton(player)
             lines[i].Visible = false
         end
     end
+
+    local humanoid = char:FindFirstChild("Humanoid")
+    local head = char:FindFirstChild("Head")
+    if humanoid and head and healthBars[player] and healthTexts[player] then
+        local health = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+        local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
+        if visible and onScreen then
+            local barLength = 40
+            local startPos = Vector2.new(headPos.X - barLength/2, headPos.Y - 30)
+            local endPos = Vector2.new(startPos.X + barLength * health, startPos.Y)
+            healthBars[player].From = startPos
+            healthBars[player].To = endPos
+            healthBars[player].Color = Color3.fromRGB(255 * (1-health), 255 * health, 0)
+            healthBars[player].Visible = true
+
+            healthTexts[player].Text = string.format("%d / %d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth))
+            healthTexts[player].Position = Vector2.new(headPos.X, startPos.Y - 12)
+            healthTexts[player].Visible = true
+        else
+            healthBars[player].Visible = false
+            healthTexts[player].Visible = false
+        end
+    elseif healthBars[player] and healthTexts[player] then
+        healthBars[player].Visible = false
+        healthTexts[player].Visible = false
+    end
 end
 
--- Configuracão do Aimbot 
+-- Aimbot: Seleção do alvo mais próximo
 local function getClosestTarget()
-    local closest = nil
-    local shortestDist = config.fov
-
+    local closest, shortestDist = nil, config.fov
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
+        if player ~= localPlayer
+            and player.Character
+            and player.Character:FindFirstChild("Head")
+            and player.Character:FindFirstChild("Humanoid")
+        then
             if config.teamCheck and player.Team == localPlayer.Team then continue end
-
             if player.Character.Humanoid.Health <= 0 then continue end
 
             local head = player.Character.Head
@@ -110,10 +183,10 @@ local function getClosestTarget()
             end
         end
     end
-
     return closest
 end
 
+-- Aimbot: Função de mira (recoil 100% compensado)
 local function aimAt(target)
     if not target or not target.Character then return end
     local head = target.Character:FindFirstChild("Head")
@@ -123,17 +196,71 @@ local function aimAt(target)
     local mousePos = UserInputService:GetMouseLocation()
     local delta = Vector2.new(screenPos.X, screenPos.Y) - mousePos
 
+    -- Compensação total do recoil (tiros sempre retos)
     if config.recoilControl then
-        delta = delta - (recoilOffset * 0.5)
+        delta = delta - recoilOffset
     end
 
     local move = delta * config.smoothness
     mousemoverel(move.X, move.Y)
 
+    -- Zera o recoil após cada tiro
     if config.recoilControl then
-        recoilOffset = recoilOffset + (move * 0.2)
+        recoilOffset = Vector2.new(0, 0)
     end
 end
+
+-- Menu Drawing
+local menuOptions = {
+    {name = "Aimbot", key = "aimbotEnabled"},
+    {name = "ESP", key = "espEnabled"},
+    {name = "Team Check", key = "teamCheck"},
+    {name = "Recoil Control", key = "recoilControl"},
+}
+local menuDrawings = {}
+local menuBaseY, menuSpacing = 100, 25
+
+local function updateMenu()
+    for i, opt in ipairs(menuOptions) do
+        if not menuDrawings[i] then
+            menuDrawings[i] = Drawing.new("Text")
+            menuDrawings[i].Size = 18
+            menuDrawings[i].Outline = true
+        end
+        menuDrawings[i].Visible = showMenu
+        menuDrawings[i].Position = Vector2.new(50, menuBaseY + (i-1)*menuSpacing)
+        menuDrawings[i].Color = config[opt.key] and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        menuDrawings[i].Text = string.format("[%d] %s: %s", i, opt.name, config[opt.key] and "ON" or "OFF")
+    end
+end
+
+local function toggleOption(index)
+    local opt = menuOptions[index]
+    if opt and config[opt.key] ~= nil then
+        config[opt.key] = not config[opt.key]
+    end
+end
+
+-- Eventos de Input
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+
+    if input.KeyCode == config.toggleMenuKey then
+        showMenu = not showMenu
+        updateMenu()
+    end
+
+    -- Atalhos para alternar opções do menu (teclas 1-4)
+    if showMenu and input.KeyCode.Value >= Enum.KeyCode.One.Value and input.KeyCode.Value <= Enum.KeyCode.Four.Value then
+        local idx = input.KeyCode.Value - Enum.KeyCode.One.Value + 1
+        toggleOption(idx)
+        updateMenu()
+    end
+
+    if input.UserInputType == config.aimKey then
+        aiming = true
+    end
+end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == config.aimKey then
@@ -142,41 +269,56 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
+-- Gerenciamento de jogadores
+local characterCleanupConnections = {}
 
-    if input.KeyCode == config.toggleMenuKey then
-        showMenu = not showMenu
-        print("Menu " .. (showMenu and "ON" or "OFF"))
+local function setupCharacterCleanup(player)
+    -- Remove conexões antigas
+    if characterCleanupConnections[player] then
+        characterCleanupConnections[player]:Disconnect()
+        characterCleanupConnections[player] = nil
     end
 
-    if input.UserInputType == config.aimKey then
-        aiming = true
+    -- Conecta cleanup para o personagem atual
+    if player.Character then
+        removeSkeleton(player)
+        characterCleanupConnections[player] = player.CharacterRemoving:Connect(function()
+            removeSkeleton(player)
+        end)
     end
-end)
 
-Players.PlayerRemoving:Connect(function(player)
-    if skeletons[player] then
-        for _, line in ipairs(skeletons[player]) do
-            line:Remove()
-        end
-        skeletons[player] = nil
-    end
-end)
-
-Players.PlayerAdded:Connect(function(player)
+    -- Sempre conecta para futuros personagens
     player.CharacterAdded:Connect(function()
-        task.wait(1)
+        removeSkeleton(player) -- Remove qualquer desenho antigo antes de criar novo
         createSkeleton(player)
+        -- Remove conexão antiga e conecta nova
+        if characterCleanupConnections[player] then
+            characterCleanupConnections[player]:Disconnect()
+        end
+        characterCleanupConnections[player] = player.CharacterRemoving:Connect(function()
+            removeSkeleton(player)
+        end)
     end)
-end)
+end
+
+Players.PlayerAdded:Connect(setupCharacterCleanup)
 
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= localPlayer then
         createSkeleton(player)
+        setupCharacterCleanup(player)
     end
 end
 
+Players.PlayerRemoving:Connect(function(player)
+    removeSkeleton(player)
+    if characterCleanupConnections[player] then
+        characterCleanupConnections[player]:Disconnect()
+        characterCleanupConnections[player] = nil
+    end
+end)
+
+-- Loop principal
 RunService.RenderStepped:Connect(function()
     if not localPlayer or not camera then return end
 
@@ -185,7 +327,7 @@ RunService.RenderStepped:Connect(function()
     fovCircle.Visible = config.aimbotEnabled
 
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
+        if player ~= localPlayer and player.Character then
             updateSkeleton(player)
         end
     end
@@ -196,4 +338,6 @@ RunService.RenderStepped:Connect(function()
             aimAt(target)
         end
     end
+
+    updateMenu()
 end)
